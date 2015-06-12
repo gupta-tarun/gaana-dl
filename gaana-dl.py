@@ -22,8 +22,11 @@ class GaanaDownloader():
             'artist' : 'http://gaana.com/artist/{name}',
             'search_songs_new' : 'http://api.gaana.com/index.php?type=search&subtype=search_song&content_filter=2&key={query}',
             'search_albums_new' : 'http://api.gaana.com/index.php?type=search&subtype=search_album&content_filter=2&key={query}',
-            'get_song_url' : 'http://api.gaana.com/getURLV1.php?quality=medium&album_id={album_id}&delivery_type=stream&hashcode={hashcode}&isrc=0&type=rtmp&track_id={track_id}',
-            'album_details' : 'http://api.gaana.com/index.php?type=album&subtype=album_detail&album_id={album_id}'
+            'get_song_url' : 'http://api.gaana.com/getURLV1.php?quality=high&album_id={album_id}&delivery_type=stream&hashcode={hashcode}&isrc=0&type=rtmp&track_id={track_id}',
+            'album_details' : 'http://api.gaana.com/index.php?type=album&subtype=album_detail&album_id={album_id}',
+            'playlist_details' : 'http://api.gaana.com/index.php?type=playlist&subtype=playlist_detail&playlist_id={playlist_id}',
+            'get_playlists' : 'http://api.gaana.com/index.php?type=playlist&subtype=topCharts&limit=0,15&language=Hindi&orderby=popularity'
+
         }
 
     def _get_url_contents(self, url):
@@ -52,6 +55,9 @@ class GaanaDownloader():
         return song_url
 
     def _download_track(self, song_url, track_name, dir_name):
+        #make sure that the name does not contain following characters < > | / \ : ? * "
+        p = re.compile(r'<|>|\\|/|:|\*|\||\?|"')
+        track_name = p.sub( '_', track_name)
         if 'mp3' in song_url:
             track_name = track_name + '.mp3'
         else:
@@ -149,10 +155,65 @@ class GaanaDownloader():
             print 'Ooopsss!!! Sorry no such album found.'
             print 'Why not try another Album? :)'
 
+    def search_playlists(self):
+        from pprint import pprint
+        url = self.urls['get_playlists']
+        response = self._get_url_contents(url)
+        playlist = response.json()['playlist']
+        if playlist:
+            playlists = map(lambda x:[x['popularity'],x['title'], x['language'], x['trackids'], x['playlist_id'], x['createdby']], playlist)
+            tabledata = [['S No.', 'Playlist Name', 'Language', 'Popularity', 'Createdby']]
+            for idx, value in enumerate(playlists):
+                tabledata.append([str(idx), value[1], value[2], value[0], value[5]])
+            table = AsciiTable(tabledata)
+            print table.table
+            idx = int(raw_input('Which playlist do you wish to download? Enter S No. :'))
+            playlist_details_url = self.urls['playlist_details']
+            playlist_details_url = playlist_details_url.format(playlist_id = playlists[idx][4])
+            #print 'Playlist : ', playlist_details_url
+            response = requests.get(playlist_details_url )
+            tracks = response.json()['tracks']
+            #print 'tracks : ', response.json()
+            tracks_list = map(lambda x:[x['track_title'].strip(),x['track_id'],x['album_id'],x['album_title'], ','.join(map(lambda y:y['name'], x['artist'])), x['duration']], tracks)
+            #print 'List of tracks for ', playlists[idx][1]
+            #print 'List of tracks for ', tracks_list
+            tabledata = [['S No.', 'Track Title', 'Track Artist']]
+            for idy, value in enumerate(tracks_list):
+                tabledata.append([str(idy), value[0], value[4]])
+            tabledata.append([str(idy+1), 'Enter this to download them all.',''])
+            table = AsciiTable(tabledata)
+            print table.table
+            print 'Downloading tracks to %s folder'%playlists[idx][1]
+            ids = raw_input('Please enter csv of S no. to download:')
+            while not self._check_input(ids, len(tracks_list)) or not ids:
+                print 'Oops!! You made some error in entering input'
+                ids = raw_input('Please enter csv of S no. to download:')
+            _dir = playlists[idx][1].replace(' ','-')
+            print 'using dir:', _dir
+            if not _dir:
+                print 'changing dir'
+                _dir = playlists[idx][1]
+                print 'using dir:', _dir
+            self._check_path(_dir)
+            ids = map(int,map(lambda x:x.strip(),ids.split(',')))
+            if len(ids) == 1 and ids[0] == idy + 1:
+                for item in tracks_list:
+                    song_url = self._get_song_url(item[1], item[2])
+                    self._download_track(song_url, item[0].replace(' ','-').strip(), _dir)
+            else:
+                for i in ids:
+                    item = tracks_list[i]
+                    song_url = self._get_song_url(item[1], item[2])
+                    self._download_track(song_url, item[0].replace(' ','-').strip(), _dir)
+        else:
+            print 'Ooopsss!!! Sorry no such album found.'
+            print 'Why not try another Album? :)'
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-a', '--album', nargs='?', help="choose this to search albums. Space seperated query must be enclosed in quotes('')", type = str )
     parser.add_argument('-s', '--song', nargs='?', help="choose this to search songs. Space seperated query must be enclosed in quotes('')", type = str)
+    parser.add_argument('-p', '--playlists', nargs='?', help="can be used to load default playlists", type = str)
     parser.add_argument('-d', '--dir', nargs='?', help="can be used to specify directory to download songs to", type = str)
     args = parser.parse_args()
     d = GaanaDownloader()
@@ -164,7 +225,10 @@ if __name__ == '__main__':
     elif args.song:
         if args.dir:
             d.search_songs(args.song, args.dir)
+    elif args.playlists:
+        if args.dir:
+            d.search_playlists()
         else:
-            d.search_songs(args.song)
+            d.search_playlists()
     else:
         print parser.parse_args(['--help'])
