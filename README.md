@@ -32,4 +32,6 @@ Usage
 
   + -d [DIR], --dir [DIR]
                         can be used to specify directory to download songs to
-
+  
+  + -p [dummy], --playlist [DIR]
+                        specify that you want to download existing playlists.

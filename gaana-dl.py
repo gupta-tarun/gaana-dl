@@ -25,7 +25,7 @@ class GaanaDownloader():
             'get_song_url' : 'http://api.gaana.com/getURLV1.php?quality=high&album_id={album_id}&delivery_type=stream&hashcode={hashcode}&isrc=0&type=rtmp&track_id={track_id}',
             'album_details' : 'http://api.gaana.com/index.php?type=album&subtype=album_detail&album_id={album_id}',
             'playlist_details' : 'http://api.gaana.com/index.php?type=playlist&subtype=playlist_detail&playlist_id={playlist_id}',
-            'get_playlists' : 'http://api.gaana.com/index.php?type=playlist&subtype=topCharts&limit=0,15&language=Hindi&orderby=popularity'
+            'get_playlists' : 'http://api.gaana.com/index.php?type=playlist&subtype=topCharts&limit=0,15&orderby=popularity'
 
         }
 
